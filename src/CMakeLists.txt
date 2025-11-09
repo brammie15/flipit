@@ -1,0 +1,6 @@
+add_library(flipit_lib
+        flipit.cpp
+)
+
+target_include_directories(flipit_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(flipit_lib PUBLIC heatshrink)
