@@ -1,5 +1,5 @@
 add_library(flipit_lib
-        flipit.cpp
+        bm_utils.cpp bm_utils.h
 )
 
 target_include_directories(flipit_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

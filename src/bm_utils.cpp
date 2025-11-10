@@ -5,10 +5,13 @@
 #include <stdexcept>
 #include <vector>
 
-#define STB_IMAGE_IMPLEMENTATION
 #include <cstring>
 
+#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 extern "C" {
 #include "heatshrink_decoder.h"
@@ -184,29 +187,42 @@ std::vector<uint8_t> LoadBM(const std::string& path) {
 }
 
 std::vector<uint8_t> LoadBMX(const std::string& path, BmxHeader& header) {
-    std::ifstream f(path, std::ios::binary);
-    if (!f) throw std::runtime_error("Failed to open file");
+    auto file = readFile(path);
+    if (file.size() < sizeof(UncompressedBmxHeader))
+        throw std::runtime_error("File too small for header");
 
-    constexpr std::streamsize headerSize = sizeof(BmxHeader);
-    f.read(reinterpret_cast<char*>(&header), headerSize);
+    // Read base header first (width, height, is_compressed)
+    UncompressedBmxHeader base{};
+    std::memcpy(&base, file.data(), sizeof(base));
 
-    if (!f) throw std::runtime_error("Failed to read header");
+    header.width = base.width;
+    header.height = base.height;
+    header.is_compressed = base.is_compressed;
+    header.compressed_size = 0; // default
 
-    std::vector<uint8_t> data{};
+    std::vector<uint8_t> result;
 
     if (header.is_compressed) {
-        std::cout << "File is compressed\n";
+        if (file.size() < sizeof(CompressedBmxHeader))
+            throw std::runtime_error("Truncated compressed header");
 
-        data.resize(header.compressed_size);
-        f.read(reinterpret_cast<char*>(data.data()), header.compressed_size);
-        if (!f) throw std::runtime_error("Failed to read compressed data");
-        data = decompressHeatshrink(data.data(), data.size());
+        // Reinterpret as compressed header
+        CompressedBmxHeader ch{};
+        std::memcpy(&ch, file.data(), sizeof(ch));
+        // header.compressed_size = swap_uint16(ch.compressed_size);
+        header.compressed_size = ch.compressed_size;
+
+        const size_t offset = sizeof(CompressedBmxHeader);
+        if (offset + header.compressed_size > file.size())
+            throw std::runtime_error("Compressed data overflow");
+
+        result = decompressHeatshrink(file.data() + offset, header.compressed_size);
     } else {
-        std::cout << "File is uncompressed\n";
-        data.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+        const size_t offset = sizeof(UncompressedBmxHeader);
+        result.assign(file.begin() + offset, file.end());
     }
 
-    return data;
+    return result;
 }
 
 std::vector<uint8_t> expandBitData(const std::vector<uint8_t>& bitData, uint32_t width, uint32_t height) {
@@ -247,33 +263,31 @@ bool writeBmx(const std::string& path, const uint8_t* pixels, uint32_t width, ui
     std::ofstream f(path, std::ios::binary);
     if (!f) return false;
 
-    bool should_compress = false;
-
     std::vector<uint8_t> bitData = convertToBitData(pixels, width, height);
     std::vector<uint8_t> compressedData = compressHeatshrink(bitData.data(), bitData.size());
-
-    if (compressedData.size() < bitData.size()) {
-        should_compress = true;
-    }
-
-    BmxHeader header{};
-    header.width = width;
-    header.height = height;
-    header.is_compressed = should_compress;
+    bool should_compress = compressedData.size() < bitData.size();
 
     if (should_compress) {
+        CompressedBmxHeader header{};
+        header.width = width;
+        header.height = height;
+        header.is_compressed = true;
+        header._pad = 0; // explicitly written
         header.compressed_size = static_cast<uint16_t>(compressedData.size());
-        f.write(reinterpret_cast<const char*>(&header), sizeof(BmxHeader));
+
+        f.write(reinterpret_cast<const char*>(&header), sizeof(header));
         f.write(reinterpret_cast<const char*>(compressedData.data()), compressedData.size());
     } else {
-        f.write(reinterpret_cast<const char*>(&header), sizeof(BmxHeader));
-        header.compressed_size = static_cast<uint16_t>(bitData.size());
-        f.seekp(sizeof(BmxHeader) - sizeof(uint16_t), std::ios::beg);
+        UncompressedBmxHeader header{};
+        header.width = width;
+        header.height = height;
+        header.is_compressed = false;
+
+        f.write(reinterpret_cast<const char*>(&header), sizeof(header));
         f.write(reinterpret_cast<const char*>(bitData.data()), bitData.size());
     }
 
     return true;
-
 
     // if (path.ends_with(".bmx")) {
     //     BmxHeader header{};
@@ -315,10 +329,9 @@ bool convertImageToBM(const std::string& inputPath, const std::string& outputPat
         return false;
     }
 
-    // const bool ok = writeBmx(outputPath, pixels, width, height, compress);
-    // stbi_image_free(pixels);
-    // return ok;
-    return true;
+    const bool ok = writeBmx(outputPath, pixels, width, height);
+    stbi_image_free(pixels);
+    return ok;
 }
 
 BmMeta readBmMeta(const std::string& path) {

@@ -13,6 +13,25 @@ struct BmxHeader {
 };
 #pragma pack(pop)
 
+#pragma  pack(push, 1)
+struct UncompressedBmxHeader {
+    uint32_t width;
+    uint32_t height;
+    bool     is_compressed;
+};
+#pragma pack(pop)
+
+#pragma  pack(push, 1)
+struct CompressedBmxHeader {
+    uint32_t width;
+    uint32_t height;
+    bool     is_compressed;
+    uint8_t _pad; //Padding to make it align to 4 bytes prob
+    uint16_t compressed_size;
+};
+#pragma pack(pop)
+
+
 #pragma pack(push, 1)
 struct BmMeta {
     uint32_t width;
@@ -21,6 +40,10 @@ struct BmMeta {
     uint32_t frame_count;
 };
 #pragma pack(pop)
+
+inline uint16_t swap_uint16(uint16_t val) {
+    return (val << 8) | (val >> 8);
+}
 
 constexpr uint8_t WINDOW_BITS = 8;
 constexpr uint8_t LOOKAHEAD_BITS = 4;
