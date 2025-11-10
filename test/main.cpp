@@ -9,7 +9,7 @@
 void printUsage() {
     std::cout << "Usage:\n"
               << "  tool bmx2png <input.bmx> [output.png]  - Convert BMX to PNG\n"
-              << "  tool png2bmx <input.png> [output.bmx]  - Convert PNG to BMX (compressed)\n";
+              << "  tool png2bmx <input.png> [output.bmx]  - Convert PNG to BMX\n";
 }
 
 int main(int argc, char** argv) {
@@ -22,14 +22,15 @@ int main(int argc, char** argv) {
 
     try {
         if (command == "bmx2png") {
-            std::string input_file = argv[2];
-            std::string output_file = (argc > 3) ? argv[3] : std::filesystem::path(input_file).stem().string() + ".png";
+            const std::string input_file = argv[2];
+            const std::string output_file = (argc > 3) ? argv[3] : std::filesystem::path(input_file).stem().string() + ".png";
 
             BmxHeader info{};
             const auto bitData = LoadBMX(input_file, info);
             const auto pixels = expandBitData(bitData, info.width, info.height);
 
-            std::cout << "Decompressed data size: " << info.compressed_size << " bytes\n";
+            std::cout << "width: " << info.width << " height: " << info.height << std::endl;
+            std::cout << "is compressed: " << (info.is_compressed ? "true" : "false") << std::endl;
 
             if (!stbi_write_png(output_file.c_str(), static_cast<int>(info.width), static_cast<int>(info.height), 1, pixels.data(), info.width)) {
                 throw std::runtime_error("Failed to write PNG");
@@ -38,10 +39,10 @@ int main(int argc, char** argv) {
             std::cout << "Saved PNG as " << output_file << "\n";
 
         } else if (command == "png2bmx") {
-            std::string input_file = argv[2];
-            std::string output_file = (argc > 3) ? argv[3] : std::filesystem::path(input_file).stem().string() + ".bmx";
+            const std::string input_file = argv[2];
+            const std::string output_file = (argc > 3) ? argv[3] : std::filesystem::path(input_file).stem().string() + ".bmx";
 
-            if (!convertImageToBM(input_file, output_file, true)) {
+            if (!convertImageToBM(input_file, output_file)) {
                 std::cerr << "Conversion failed\n";
                 return 1;
             }

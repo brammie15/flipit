@@ -1,10 +1,10 @@
-add_executable(flipit_test main.cpp)
+add_executable(flipit main.cpp)
 
-target_link_libraries(flipit_test PRIVATE flipit_lib)
+target_link_libraries(flipit PRIVATE flipit_lib)
 
 # Copy assets to build directory
-add_custom_command(TARGET flipit_test POST_BUILD
+add_custom_command(TARGET flipit POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/assets
-        $<TARGET_FILE_DIR:flipit_test>/assets
+        $<TARGET_FILE_DIR:flipit>/assets
 )
