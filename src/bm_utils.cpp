@@ -204,7 +204,7 @@ std::vector<uint8_t> LoadBMX(const std::string& path, BmxHeader& header) {
         std::memcpy(&ch, file.data(), sizeof(ch));
         header.compressed_size = ch.compressed_size;
 
-        const size_t offset = sizeof(CompressedBmxHeader);
+        constexpr size_t offset = sizeof(CompressedBmxHeader);
         if (offset + header.compressed_size > file.size())
             throw std::runtime_error("Compressed data overflow");
 
@@ -251,12 +251,12 @@ std::vector<uint8_t> convertToBitData(const uint8_t* data, const uint32_t width,
     return bitData;
 }
 
-bool writeBmx(const std::string& path, const uint8_t* pixels, uint32_t width, uint32_t height) {
+bool writeBmx(const std::string& path, const uint8_t* pixels, const uint32_t width, const uint32_t height) {
     std::ofstream f(path, std::ios::binary);
     if (!f) return false;
 
-    std::vector<uint8_t> bitData = convertToBitData(pixels, width, height);
-    std::vector<uint8_t> compressedData = compressHeatshrink(bitData.data(), bitData.size());
+    const std::vector<uint8_t> bitData = convertToBitData(pixels, width, height);
+    const std::vector<uint8_t> compressedData = compressHeatshrink(bitData.data(), bitData.size());
     const bool should_compress = compressedData.size() < bitData.size();
 
     if (should_compress) {
